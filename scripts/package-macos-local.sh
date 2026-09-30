@@ -67,6 +67,31 @@ if problems:
 print("Contrôle des chemins de dépendances réussi.")
 PY
 
+python3 - "$BUILD_DIR/CMakeCache.txt" "$APP/Contents/Info.plist" <<'PYPLIST'
+from pathlib import Path
+import plistlib
+import re
+import sys
+
+cache = Path(sys.argv[1]).read_text()
+match = re.search(
+    r"^CMAKE_OSX_DEPLOYMENT_TARGET:[^=]+=(.+)$", cache, re.MULTILINE
+)
+if not match:
+    sys.exit("Cible minimale macOS absente du cache CMake.")
+target = match.group(1).strip()
+if not re.fullmatch(r"\d+(?:\.\d+){0,2}", target):
+    sys.exit(f"Cible macOS invalide : {target}")
+
+path = Path(sys.argv[2])
+with path.open("rb") as handle:
+    info = plistlib.load(handle)
+info["LSMinimumSystemVersion"] = target
+with path.open("wb") as handle:
+    plistlib.dump(info, handle, sort_keys=False)
+print(f"Version minimale du bundle : macOS {target}")
+PYPLIST
+
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
